@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Jesse's Pro Golf Tour</title>
+    <title>Jesse's Golf: Egg Surprise</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #1a1a1a; /* Dark background outside the game */
+            background-color: #1a1a1a;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
@@ -16,29 +16,28 @@
             touch-action: none;
         }
 
-        /* 1. THE GAME AREA (Top Section) */
+        /* 1. THE GAME AREA */
         #game-area {
-            flex: 1; /* Takes up all available space */
+            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
             background-image: radial-gradient(circle, #333, #111);
-            padding: 20px; /* MARGIN: Space for fingers around the board */
+            padding: 20px;
         }
 
         canvas {
-            /* The Game Board */
             max-width: 100%;
             max-height: 100%;
-            aspect-ratio: 2/3; /* Portrait Ratio */
+            aspect-ratio: 2/3;
             border-radius: 15px;
             box-shadow: 0 0 20px rgba(0,0,0,0.8);
-            border: 8px solid #5d4037; /* Wood Frame */
+            border: 8px solid #5d4037;
             background: #4cd137;
             display: block;
         }
 
-        /* 2. THE DASHBOARD (Bottom Section) */
+        /* 2. THE DASHBOARD */
         #dashboard {
             height: 100px;
             background: #2c3e50;
@@ -51,28 +50,15 @@
             z-index: 10;
         }
 
-        .info-panel {
-            display: flex;
-            flex-direction: column;
-        }
+        .info-panel { display: flex; flex-direction: column; }
         .player-name { font-size: 20px; font-weight: bold; color: #f1c40f; }
         .level-info { font-size: 14px; color: #bdc3c7; margin-top: 4px; }
 
-        /* Buttons */
-        .controls {
-            display: flex;
-            gap: 10px;
-        }
-        
+        .controls { display: flex; gap: 10px; }
         .btn {
-            background: #ecf0f1;
-            border: none;
-            border-radius: 12px;
-            padding: 10px 15px;
-            font-size: 24px;
-            cursor: pointer;
-            box-shadow: 0 4px #bdc3c7;
-            transition: all 0.1s;
+            background: #ecf0f1; border: none; border-radius: 12px;
+            padding: 10px 15px; font-size: 24px; cursor: pointer;
+            box-shadow: 0 4px #bdc3c7; transition: all 0.1s;
         }
         .btn:active { transform: translateY(4px); box-shadow: 0 0 transparent; }
         .rainbow-btn { background: linear-gradient(45deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff); color: white; border: 2px solid white; }
@@ -123,7 +109,7 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    // UI Elements
+    // UI
     const levelDisplay = document.getElementById('level-display');
     const overlay = document.getElementById('overlay');
     const overlayTitle = document.getElementById('overlay-title');
@@ -132,21 +118,22 @@
     const rainbowBtn = document.getElementById('rainbowToggle');
     const resetBtn = document.getElementById('resetBtn');
 
-    // --- Assets & State ---
+    // --- Assets ---
     const grassPattern = (() => {
         const c = document.createElement('canvas'); c.width = 64; c.height = 64;
         const x = c.getContext('2d');
-        x.fillStyle = '#27ae60'; x.fillRect(0,0,64,64); // Darker pro grass
+        x.fillStyle = '#27ae60'; x.fillRect(0,0,64,64);
         x.fillStyle = '#2ecc71'; x.globalAlpha = 0.2;
         x.beginPath(); x.arc(10,10,30,0,Math.PI*2); x.fill();
         x.beginPath(); x.arc(50,50,20,0,Math.PI*2); x.fill();
         return ctx.createPattern(c, 'repeat');
     })();
 
+    // --- State ---
     let currentLevelIdx = 0;
     let strokes = 0;
     let gameState = 'PLAYING';
-    let isRainbow = false; // Toggle state
+    let isRainbow = false; 
     let rainbowHue = 0;
 
     // Physics
@@ -162,80 +149,34 @@
     let hole = { x: 300, y: 100, r: 24 };
     let walls = [];
     let chickens = [];
+    let eggs = []; // NEW: Array to store laid eggs
 
-    // --- LEVEL DESIGN (Fixed Paths) ---
+    // --- LEVELS ---
     const levels = [];
     function addLevel(bX, bY, hX, hY, wallData, chickenData = []) {
         levels.push({ ball: {x: bX, y: bY}, hole: {x: hX, y: hY}, walls: wallData, chickens: chickenData });
     }
 
-    // 1. Straight
     addLevel(300, 800, 300, 150, [{x: 100, y: 400, w: 20, h: 200}, {x: 480, y: 400, w: 20, h: 200}]);
-    
-    // 2. The Gate
     addLevel(300, 800, 300, 100, [{x: 0, y: 450, w: 220, h: 30}, {x: 380, y: 450, w: 220, h: 30}]);
-
-    // 3. Chicken Intro
-    addLevel(300, 800, 300, 100, [], [{x: 300, y: 450, r: 40}]);
-
-    // 4. Zig Zag
+    addLevel(300, 800, 300, 100, [], [{x: 300, y: 450, r: 40}]); // Chicken Intro
     addLevel(100, 800, 500, 100, [{x: 0, y: 600, w: 400, h: 20}, {x: 200, y: 300, w: 400, h: 20}]);
-
-    // 5. Chicken Army
     addLevel(300, 800, 300, 100, [], [{x: 150, y: 300, r: 35}, {x: 450, y: 300, r: 35}, {x: 300, y: 500, r: 35}]);
-
-    // 6. FIXED LEVEL (Gap in middle)
-    addLevel(300, 800, 300, 100, [
-        {x: 0, y: 400, w: 240, h: 20},  // Left Wall
-        {x: 360, y: 400, w: 240, h: 20} // Right Wall (Gap is 240 to 360)
-    ]);
-
-    // 7. Long Shot
+    addLevel(300, 800, 300, 100, [{x: 0, y: 400, w: 240, h: 20}, {x: 360, y: 400, w: 240, h: 20}]);
     addLevel(100, 850, 500, 50, [{x: 290, y: 100, w: 20, h: 700}]);
-
-    // 8. Chicken Guard
     addLevel(300, 800, 300, 100, [{x: 200, y: 200, w: 20, h: 100}, {x: 380, y: 200, w: 20, h: 100}], [{x: 300, y: 250, r: 30}]);
-
-    // 9. Diagonal
     addLevel(100, 800, 500, 100, [{x: 100, y: 600, w: 200, h: 20}, {x: 300, y: 400, w: 200, h: 20}, {x: 100, y: 200, w: 200, h: 20}]);
-
-    // 10. Tunnel (Widened)
     addLevel(300, 850, 300, 50, [{x: 240, y: 0, w: 20, h: 900}, {x: 340, y: 0, w: 20, h: 900}]);
-
-    // 11. Giant Chicken
     addLevel(500, 800, 100, 100, [], [{x: 300, y: 450, r: 65}]); 
-
-    // 12. Cross
     addLevel(300, 800, 300, 100, [{x: 200, y: 450, w: 200, h: 20}, {x: 290, y: 350, w: 20, h: 200}]);
-
-    // 13. Islands
     addLevel(300, 800, 300, 100, [], [{x:200, y:600, r:30}, {x:400, y:400, r:30}, {x:200, y:200, r:30}]);
-
-    // 14. Two Bars (Fixed Gaps)
     addLevel(300, 800, 300, 100, [{x:0, y:300, w:450, h:20}, {x:150, y:600, w:450, h:20}]);
-
-    // 15. Split
     addLevel(50, 500, 550, 500, [{x:290, y:150, w:20, h:600}]);
-
-    // 16. Four Corners
     addLevel(300, 800, 300, 100, [], [{x:150, y:300, r:30}, {x:450, y:300, r:30}, {x:150, y:600, r:30}, {x:450, y:600, r:30}]);
-
-    // 17. The Block
     addLevel(300, 800, 300, 100, [{x:250, y:300, w:100, h:300}]);
-
-    // 18. Reverse Shot
     addLevel(100, 100, 500, 800, [{x:0,y:450,w:400,h:20}], [{x:500, y:450, r:40}]);
-
-    // 19. Chicken Line
     addLevel(300, 800, 300, 100, [], [{x:300,y:450,r:20}, {x:300,y:350,r:20}, {x:300,y:250,r:20}, {x:300,y:550,r:20}]);
-
-    // 20. The Impossible?
-    addLevel(300, 850, 300, 50, [
-        {x:0, y:700, w:400, h:20},
-        {x:200, y:500, w:400, h:20},
-        {x:0, y:300, w:400, h:20},
-        {x:200, y:150, w:400, h:20}
-    ]);
+    addLevel(300, 850, 300, 50, [{x:0, y:700, w:400, h:20}, {x:200, y:500, w:400, h:20}, {x:0, y:300, w:400, h:20}, {x:200, y:150, w:400, h:20}]);
 
 
     // --- Logic ---
@@ -254,7 +195,9 @@
         ball.vx = 0; ball.vy = 0;
         hole.x = d.hole.x; hole.y = d.hole.y;
         walls = d.walls;
-        chickens = d.chickens || [];
+        // Deep copy chickens so we can add 'hasLaidEgg' property safely
+        chickens = d.chickens.map(c => ({...c, hasLaidEgg: false})); 
+        eggs = []; // Clear eggs
         
         strokes = 0;
         gameState = 'PLAYING';
@@ -262,104 +205,77 @@
         overlay.style.display = 'none';
     }
 
-    // Toggle Rainbow
-    rainbowBtn.onclick = () => {
-        isRainbow = !isRainbow;
-        rainbowBtn.innerText = isRainbow ? "⚪" : "🌈";
+    rainbowBtn.onclick = () => { isRainbow = !isRainbow; rainbowBtn.innerText = isRainbow ? "⚪" : "🌈"; };
+    resetBtn.onclick = () => { 
+        const d = levels[currentLevelIdx]; ball.x = d.ball.x; ball.y = d.ball.y; ball.vx=0; ball.vy=0; 
     };
 
-    resetBtn.onclick = () => {
-        // Reset ball to start of level
-        const d = levels[currentLevelIdx];
-        ball.x = d.ball.x; ball.y = d.ball.y;
-        ball.vx = 0; ball.vy = 0;
-        strokes++; // Penalty stroke? Maybe not for kids.
-    };
-
-    // Input Handling (Corrected for Canvas Position)
     function getPos(e) {
         const r = canvas.getBoundingClientRect();
         const sx = canvas.width / r.width;
         const sy = canvas.height / r.height;
         let cx = e.clientX, cy = e.clientY;
         if(e.touches && e.touches.length) { cx=e.touches[0].clientX; cy=e.touches[0].clientY; }
-        
-        // This math works even if you drag OUTSIDE the canvas, 
-        // because we compare it to the canvas rect.
         return { x: (cx-r.left)*sx, y: (cy-r.top)*sy };
     }
 
     function start(e) {
         if(Math.abs(ball.vx)<0.1 && Math.abs(ball.vy)<0.1) {
-            isDragging=true;
-            dragStart = getPos(e);
-            dragCurrent = dragStart;
+            isDragging=true; dragStart = getPos(e); dragCurrent = dragStart;
         }
     }
-    
-    // Note: Event listener on WINDOW allows dragging outside the canvas
     function move(e) {
-        if(isDragging) {
-            // Prevent scrolling
-            if(e.cancelable) e.preventDefault(); 
-            dragCurrent = getPos(e);
-        }
+        if(isDragging) { if(e.cancelable) e.preventDefault(); dragCurrent = getPos(e); }
     }
-    
     function end() {
         if(isDragging) {
             isDragging=false;
             let dx = dragStart.x - dragCurrent.x;
             let dy = dragStart.y - dragCurrent.y;
-            ball.vx = dx * POWER_SCALE;
-            ball.vy = dy * POWER_SCALE;
-            
-            // Speed Cap
+            ball.vx = dx * POWER_SCALE; ball.vy = dy * POWER_SCALE;
             let s = Math.sqrt(ball.vx**2 + ball.vy**2);
-            if(s > MAX_POWER) {
-                ball.vx *= (MAX_POWER/s);
-                ball.vy *= (MAX_POWER/s);
-            }
+            if(s > MAX_POWER) { ball.vx *= (MAX_POWER/s); ball.vy *= (MAX_POWER/s); }
             if(s > 1) strokes++;
         }
     }
 
-    // Attach listeners to WINDOW for move/end to allow "off-grass" dragging
     canvas.addEventListener('mousedown', start);
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', end);
-    
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
     canvas.addEventListener('touchstart', start, {passive:false});
-    window.addEventListener('touchmove', move, {passive:false});
-    window.addEventListener('touchend', end);
+    window.addEventListener('touchmove', move, {passive:false}); window.addEventListener('touchend', end);
 
     function update() {
         if(gameState !== 'PLAYING') return;
 
+        // Ball Move
         ball.x += ball.vx; ball.y += ball.vy;
         ball.vx *= FRICTION; ball.vy *= FRICTION;
         if(Math.abs(ball.vx)<0.1) ball.vx=0;
         if(Math.abs(ball.vy)<0.1) ball.vy=0;
 
-        // Wall Bounce
+        // Egg Physics (Eggs slide a bit then stop)
+        eggs.forEach(egg => {
+            egg.x += egg.vx; egg.y += egg.vy;
+            egg.vx *= 0.9; egg.vy *= 0.9; // High friction for eggs
+        });
+
+        // Bounds
         if(ball.x<ball.r) { ball.x=ball.r; ball.vx*=-0.8; }
         if(ball.x>canvas.width-ball.r) { ball.x=canvas.width-ball.r; ball.vx*=-0.8; }
         if(ball.y<ball.r) { ball.y=ball.r; ball.vy*=-0.8; }
         if(ball.y>canvas.height-ball.r) { ball.y=canvas.height-ball.r; ball.vy*=-0.8; }
 
-        // Obstacles (Walls)
+        // Walls
         walls.forEach(w => {
             let cx = Math.max(w.x, Math.min(ball.x, w.x+w.w));
             let cy = Math.max(w.y, Math.min(ball.y, w.y+w.h));
             let dx = ball.x - cx, dy = ball.y - cy;
             let dist = Math.sqrt(dx*dx + dy*dy);
             if(dist < ball.r) {
-                if(Math.abs(dx) > Math.abs(dy)) ball.vx *= -1;
-                else ball.vy *= -1;
+                if(Math.abs(dx) > Math.abs(dy)) ball.vx *= -1; else ball.vy *= -1;
                 let pen = ball.r - dist;
                 let angle = Math.atan2(dy, dx);
-                ball.x += Math.cos(angle)*pen;
-                ball.y += Math.sin(angle)*pen;
+                ball.x += Math.cos(angle)*pen; ball.y += Math.sin(angle)*pen;
             }
         });
 
@@ -369,12 +285,45 @@
             let dist = Math.sqrt(dx*dx + dy*dy);
             let minDist = c.r + ball.r;
             if(dist < minDist) {
+                // Bounce
                 let angle = Math.atan2(dy, dx);
                 let tx = c.x + Math.cos(angle) * minDist;
                 let ty = c.y + Math.sin(angle) * minDist;
                 let ax = (tx - ball.x) * 0.1, ay = (ty - ball.y) * 0.1;
                 ball.vx -= ax; ball.vy -= ay; ball.vx *= -0.9; ball.vy *= -0.9;
                 ball.x = tx; ball.y = ty;
+
+                // --- EGG LOGIC ---
+                if(!c.hasLaidEgg) {
+                    c.hasLaidEgg = true;
+                    // Spawn egg slightly random direction
+                    eggs.push({
+                        x: c.x, 
+                        y: c.y, 
+                        r: 10, 
+                        vx: (Math.random()-0.5) * 5, 
+                        vy: (Math.random()-0.5) * 5
+                    });
+                }
+            }
+        });
+
+        // Ball vs Eggs (Eggs are obstacles!)
+        eggs.forEach(egg => {
+            let dx = ball.x - egg.x, dy = ball.y - egg.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            let minDist = egg.r + ball.r;
+            if(dist < minDist) {
+                // Bounce off egg
+                let angle = Math.atan2(dy, dx);
+                let tx = egg.x + Math.cos(angle) * minDist;
+                let ty = egg.y + Math.sin(angle) * minDist;
+                ball.vx *= -0.9; ball.vy *= -0.9;
+                ball.x = tx; ball.y = ty;
+                
+                // Egg gets pushed a tiny bit too
+                egg.vx -= ball.vx * 0.2;
+                egg.vy -= ball.vy * 0.2;
             }
         });
 
@@ -393,10 +342,12 @@
         }
     }
 
-    function drawChickenBanana(x, y, r) {
+    function drawChickenBanana(c) {
+        let x=c.x, y=c.y, r=c.r;
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
         ctx.fillStyle = '#fff'; ctx.fill();
         ctx.strokeStyle = '#ccc'; ctx.lineWidth=2; ctx.stroke();
+        
         ctx.save(); ctx.translate(x, y - r/2); ctx.rotate(-0.2);
         ctx.beginPath(); ctx.arc(0, -5, r*0.6, 0.5, 2.6);
         ctx.bezierCurveTo(-r*0.8, -r*0.5, r*0.8, -r*0.5, r*0.3, 2);
@@ -405,6 +356,20 @@
         ctx.beginPath(); ctx.arc(-5, -5, 2, 0, Math.PI*2); ctx.fillStyle='black'; ctx.fill();
         ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-18, 4); ctx.lineTo(-10, 8); ctx.fillStyle = '#e67e22'; ctx.fill();
         ctx.restore();
+
+        // If it hasn't laid an egg yet, maybe draw a little mystery? 
+        // nah, let's keep it a surprise.
+    }
+
+    function drawEgg(e) {
+        ctx.beginPath();
+        // Ellipse shape
+        ctx.ellipse(e.x, e.y, e.r, e.r*1.2, 0, 0, Math.PI*2);
+        ctx.fillStyle = '#f0f0f0'; 
+        ctx.fill();
+        ctx.strokeStyle = '#bdc3c7';
+        ctx.lineWidth = 1;
+        ctx.stroke();
     }
 
     function draw() {
@@ -415,45 +380,6 @@
         ctx.fillStyle = '#111'; ctx.fill(); 
         ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=4; ctx.stroke();
 
-        // Walls (Wood look)
+        // Walls
         ctx.fillStyle = '#8d6e63';
-        walls.forEach(w => {
-            ctx.fillRect(w.x, w.y, w.w, w.h);
-            ctx.strokeStyle='#5d4037'; ctx.lineWidth=3; ctx.strokeRect(w.x,w.y,w.w,w.h);
-            // Nails
-            ctx.fillStyle='#3e2723';
-            ctx.beginPath(); ctx.arc(w.x+5,w.y+5,2,0,Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(w.x+w.w-5,w.y+w.h-5,2,0,Math.PI*2); ctx.fill();
-            ctx.fillStyle='#8d6e63'; // Reset
-        });
-
-        chickens.forEach(c => drawChickenBanana(c.x, c.y, c.r));
-
-        // Drag Line
-        if(isDragging) {
-            let dx = dragStart.x - dragCurrent.x;
-            let dy = dragStart.y - dragCurrent.y;
-            ctx.beginPath(); ctx.moveTo(ball.x, ball.y); ctx.lineTo(ball.x+dx, ball.y+dy);
-            ctx.strokeStyle = 'white'; ctx.lineWidth=5; ctx.setLineDash([10,10]); ctx.stroke(); ctx.setLineDash([]);
-        }
-
-        // BALL
-        ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
-        if(isRainbow) {
-            rainbowHue = (rainbowHue + 2) % 360;
-            ctx.fillStyle = `hsl(${rainbowHue}, 100%, 50%)`;
-        } else {
-            let g = ctx.createRadialGradient(ball.x-5, ball.y-5, 2, ball.x, ball.y, ball.r);
-            g.addColorStop(0, 'white'); g.addColorStop(1, '#bdc3c7');
-            ctx.fillStyle = g;
-        }
-        ctx.fill();
-        ctx.strokeStyle='#7f8c8d'; ctx.lineWidth=2; ctx.stroke();
-    }
-
-    function loop() { update(); draw(); requestAnimationFrame(loop); }
-    loadLevel(0);
-    loop();
-</script>
-</body>
-</html>
+        walls
