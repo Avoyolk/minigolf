@@ -12,9 +12,10 @@
             overflow: hidden;
             background-color: #202020;
             font-family: 'Press Start 2P', cursive;
-            touch-action: none;
+            touch-action: none; /* Prevents scrolling during games */
             user-select: none;
             -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent; /* Removes blue highlight on tap */
         }
 
         /* --- MENUS --- */
@@ -24,6 +25,8 @@
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             z-index: 1000;
+            /* CRITICAL FIX FOR IOS: Allows taps to register on the menu */
+            touch-action: manipulation; 
         }
 
         h1 {
@@ -31,6 +34,7 @@
             margin-bottom: 40px; font-size: 28px; text-align: center; line-height: 1.5;
         }
 
+        /* CHANGED: This targets BUTTONS now, not DIVs */
         .game-card {
             width: 300px; height: 100px; margin: 15px;
             border: 4px solid #fff; border-radius: 12px;
@@ -38,6 +42,11 @@
             cursor: pointer; transition: transform 0.2s;
             position: relative; overflow: hidden;
             box-shadow: 0 8px 15px rgba(0,0,0,0.3);
+            /* Reset Default Button Styles */
+            font-family: 'Press Start 2P', cursive;
+            text-decoration: none;
+            appearance: none; -webkit-appearance: none;
+            outline: none;
         }
         .game-card:active { transform: scale(0.96); }
 
@@ -47,7 +56,7 @@
         .card-axo { background: #ff9ff3; color: #2d3436; }
         .card-axo::before { content: '🦎'; font-size: 40px; margin-right: 15px; }
 
-        .game-title { font-size: 14px; line-height: 20px; text-align: left; }
+        .game-title { font-size: 14px; line-height: 20px; text-align: left; pointer-events: none;}
 
         #back-btn {
             position: absolute; top: 10px; left: 10px; z-index: 9999;
@@ -55,6 +64,7 @@
             border: 2px solid white; padding: 8px 10px;
             font-family: 'Press Start 2P', cursive; font-size: 10px;
             cursor: pointer; display: none;
+            touch-action: manipulation; /* Fix for back button on iOS */
         }
 
         /* --- WRAPPERS --- */
@@ -77,6 +87,7 @@
         .g-btn {
             background: #ecf0f1; border: none; border-radius: 8px;
             padding: 8px 12px; font-size: 18px; margin-left: 5px;
+            cursor: pointer;
         }
         #golf-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -109,12 +120,12 @@
 
     <div id="main-menu">
         <h1>JESSE'S<br>ARCADE</h1>
-        <div class="game-card card-golf" onclick="startGame('GOLF')">
+        <button class="game-card card-golf" onclick="startGame('GOLF')">
             <span class="game-title">MINI GOLF<br>CENTURION</span>
-        </div>
-        <div class="game-card card-axo" onclick="startGame('AXO')">
+        </button>
+        <button class="game-card card-axo" onclick="startGame('AXO')">
             <span class="game-title">AXOLOTL<br>ABYSS</span>
-        </div>
+        </button>
     </div>
 
     <div id="golf-wrapper">
@@ -150,7 +161,7 @@
 
 <script>
     // === SYSTEM MANAGER ===
-    let activeGame = null; // 'GOLF', 'AXO', or null
+    let activeGame = null; 
     const menu = document.getElementById('main-menu');
     const backBtn = document.getElementById('back-btn');
     const golfWrapper = document.getElementById('golf-wrapper');
@@ -225,7 +236,7 @@
     }
 
     function loadGLevel(idx) {
-        if(idx>=gLevels.length) { idx=0; gLevelIdx=0; } // Loop back
+        if(idx>=gLevels.length) { idx=0; gLevelIdx=0; }
         const d = gLevels[idx];
         ball.x=d.ball.x; ball.y=d.ball.y; ball.vx=0; ball.vy=0;
         hole.x=d.hole.x; hole.y=d.hole.y;
@@ -244,12 +255,30 @@
         return {x:(cx-r.left)*sx, y:(cy-r.top)*sy};
     }
     
-    // Note: We attach window listeners but check activeGame
-    window.addEventListener('mousedown', (e)=>{ if(activeGame!=='GOLF' || gState!=='PLAYING') return; gDrag.ing=true; gDrag.start=gGetPos(e); gDrag.curr=gDrag.start; });
-    window.addEventListener('touchstart', (e)=>{ if(activeGame!=='GOLF' || gState!=='PLAYING') return; gDrag.ing=true; gDrag.start=gGetPos(e); gDrag.curr=gDrag.start; }, {passive:false});
-    window.addEventListener('mousemove', (e)=>{ if(!gDrag.ing) return; if(e.preventDefault) e.preventDefault(); gDrag.curr=gGetPos(e); });
-    window.addEventListener('touchmove', (e)=>{ if(!gDrag.ing) return; if(e.preventDefault) e.preventDefault(); gDrag.curr=gGetPos(e); }, {passive:false});
-    window.addEventListener('mouseup', gEnd); window.addEventListener('touchend', gEnd);
+    // Global Listeners with Safety Check
+    // We keep these on window for Golf dragging, but return early if in menu
+    window.addEventListener('mousedown', (e)=>{ 
+        if(activeGame!=='GOLF' || gState!=='PLAYING') return; 
+        gDrag.ing=true; gDrag.start=gGetPos(e); gDrag.curr=gDrag.start; 
+    });
+    window.addEventListener('touchstart', (e)=>{ 
+        if(activeGame!=='GOLF' || gState!=='PLAYING') return; 
+        gDrag.ing=true; gDrag.start=gGetPos(e); gDrag.curr=gDrag.start; 
+    }, {passive:false});
+    
+    window.addEventListener('mousemove', (e)=>{ 
+        if(!gDrag.ing) return; 
+        if(e.cancelable) e.preventDefault(); 
+        gDrag.curr=gGetPos(e); 
+    });
+    window.addEventListener('touchmove', (e)=>{ 
+        if(!gDrag.ing) return; 
+        if(e.cancelable) e.preventDefault(); 
+        gDrag.curr=gGetPos(e); 
+    }, {passive:false});
+    
+    window.addEventListener('mouseup', gEnd); 
+    window.addEventListener('touchend', gEnd);
 
     function gEnd() {
         if(!gDrag.ing) return;
@@ -276,11 +305,9 @@
             ball.vx*=0.97; ball.vy*=0.97;
             if(Math.abs(ball.vx)<0.1) ball.vx=0; if(Math.abs(ball.vy)<0.1) ball.vy=0;
 
-            // Bounds
             if(ball.x<ball.r || ball.x>600-ball.r) ball.vx*=-0.8; ball.x=Math.max(ball.r, Math.min(600-ball.r, ball.x));
             if(ball.y<ball.r || ball.y>900-ball.r) ball.vy*=-0.8; ball.y=Math.max(ball.r, Math.min(900-ball.r, ball.y));
 
-            // Ponds
             ponds.forEach(p => {
                 if(Math.hypot(ball.x-p.x, ball.y-p.y) < p.r-5) {
                     gState='DROWNING'; 
@@ -289,27 +316,23 @@
                 }
             });
 
-            // Walls & Blocks
             [...walls.map(w=>({...w, t:'rect'})), ...blocks67.map(b=>({x:b.x-b.s/2, y:b.y-b.s/2, w:b.s, h:b.s, t:'rect'}))].forEach(o => {
                 let cx = Math.max(o.x, Math.min(ball.x, o.x+o.w));
                 let cy = Math.max(o.y, Math.min(ball.y, o.y+o.h));
                 if(Math.hypot(ball.x-cx, ball.y-cy) < ball.r) {
                     if(Math.abs(ball.x-cx) > Math.abs(ball.y-cy)) ball.vx*=-1; else ball.vy*=-1;
-                    ball.x += (ball.x-cx)*0.1; ball.y += (ball.y-cy)*0.1; // Push out
+                    ball.x += (ball.x-cx)*0.1; ball.y += (ball.y-cy)*0.1; 
                 }
             });
 
-            // Chickens
             chickens.forEach(c => {
                 if(Math.hypot(ball.x-c.x, ball.y-c.y) < c.r+ball.r) {
                     ball.vx*=-0.9; ball.vy*=-0.9;
                     if(!c.laid) { c.laid=true; eggs.push({x:c.x,y:c.y,r:12,vx:(Math.random()-.5)*5,vy:5}); }
                 }
             });
-            // Eggs
             eggs.forEach(e => { e.x+=e.vx; e.y+=e.vy; e.vx*=0.9; e.vy*=0.9; });
 
-            // Win
             if(Math.hypot(ball.x-hole.x, ball.y-hole.y) < hole.r && Math.abs(ball.vx)<5) {
                 gState='WON';
                 document.getElementById('go-sub').innerText = `Strokes: ${gStrokes}`;
@@ -320,37 +343,30 @@
         // Draw
         gCtx.fillStyle = '#27ae60'; gCtx.fillRect(0,0,600,900);
         
-        // Ponds
         ponds.forEach(p=>{ gCtx.fillStyle='#3498db'; gCtx.beginPath(); gCtx.arc(p.x,p.y,p.r,0,7); gCtx.fill(); });
         
-        // Hole
         gCtx.fillStyle='#111'; gCtx.beginPath(); gCtx.arc(hole.x,hole.y,hole.r,0,7); gCtx.fill();
 
-        // Walls
         gCtx.fillStyle='#8d6e63'; walls.forEach(w=>gCtx.fillRect(w.x,w.y,w.w,w.h));
         
-        // Blocks 67
         blocks67.forEach(b=>{
             gCtx.fillStyle='#7f8c8d'; gCtx.fillRect(b.x-b.s/2,b.y-b.s/2,b.s,b.s);
             gCtx.strokeStyle='#2c3e50'; gCtx.strokeRect(b.x-b.s/2,b.y-b.s/2,b.s,b.s);
             gCtx.fillStyle='#f1c40f'; gCtx.font='bold 30px Arial'; gCtx.textAlign='center'; gCtx.textBaseline='middle'; gCtx.fillText("67",b.x,b.y);
         });
 
-        // Chickens
         chickens.forEach(c=>{
             gCtx.fillStyle='#fff'; gCtx.beginPath(); gCtx.arc(c.x,c.y,c.r,0,7); gCtx.fill();
-            gCtx.fillStyle='#e67e22'; gCtx.beginPath(); gCtx.arc(c.x,c.y-5,5,0,7); gCtx.fill(); // Beak
+            gCtx.fillStyle='#e67e22'; gCtx.beginPath(); gCtx.arc(c.x,c.y-5,5,0,7); gCtx.fill();
         });
         eggs.forEach(e=>{ gCtx.fillStyle='#fff'; gCtx.beginPath(); gCtx.arc(e.x,e.y,e.r,0,7); gCtx.fill(); });
 
-        // Drag Line
         if(gDrag.ing) {
             gCtx.strokeStyle='white'; gCtx.lineWidth=4; gCtx.setLineDash([10,10]);
             gCtx.beginPath(); gCtx.moveTo(ball.x,ball.y); 
             gCtx.lineTo(ball.x+(gDrag.start.x-gDrag.curr.x), ball.y+(gDrag.start.y-gDrag.curr.y)); gCtx.stroke(); gCtx.setLineDash([]);
         }
 
-        // Ball
         if(gState!=='DROWNING') {
             gCtx.beginPath(); gCtx.arc(ball.x,ball.y,ball.r,0,7);
             gCtx.fillStyle = gIsRainbow ? `hsl(${(gRainbowHue+=5)%360},100%,50%)` : 'white';
@@ -395,8 +411,14 @@
             for(let i=0;i<3;i++) aBubbles.push({x:axo.x,y:axo.y,r:Math.random()*4,s:Math.random()*2+1});
         }
     }
+    
+    // Axolotl Inputs - Listen to Window but check activeGame
     window.addEventListener('mousedown', aSwim);
-    window.addEventListener('touchstart', (e)=>{e.preventDefault(); aSwim();}, {passive:false});
+    window.addEventListener('touchstart', (e)=>{
+        if(activeGame !== 'AXO') return;
+        e.preventDefault(); 
+        aSwim();
+    }, {passive:false});
 
     function axoLoop() {
         if(activeGame !== 'AXO') return;
@@ -404,23 +426,19 @@
         if(aState === 'PLAY') {
             axo.dy += 0.4; axo.y += axo.dy;
             
-            // Gen
             if(aFrame%100===0) {
                 let gap=200, h=Math.random()*(aCanvas.height-300)+50;
-                aObstacles.push({x:aCanvas.width,y:0,w:50,h:h}); // Top
-                aObstacles.push({x:aCanvas.width,y:h+gap,w:50,h:aCanvas.height}); // Bot
+                aObstacles.push({x:aCanvas.width,y:0,w:50,h:h}); 
+                aObstacles.push({x:aCanvas.width,y:h+gap,w:50,h:aCanvas.height});
             }
             if(aFrame%70===0) aFish.push({x:aCanvas.width, y:Math.random()*(aCanvas.height-100)+50, c:`hsl(${Math.random()*360},70%,50%)`, caught:false});
 
-            // Move
             aObstacles.forEach(o=>o.x-=aSpeed);
             aFish.forEach(f=>f.x-=aSpeed);
             aBubbles.forEach(b=>{b.y-=b.s; b.x-=1;});
 
-            // Cleanup
             aObstacles = aObstacles.filter(o=>o.x+o.w>0);
             
-            // Collision
             if(axo.y<0 || axo.y>aCanvas.height) aState='GAMEOVER';
             aObstacles.forEach(o=>{
                 if(axo.x+15>o.x && axo.x-15<o.x+o.w && axo.y+10>o.y && axo.y-10<o.y+o.h) aState='GAMEOVER';
@@ -434,11 +452,8 @@
             aSpeed+=0.001; aFrame++;
         }
 
-        // Draw
         aCtx.fillStyle = '#0984e3'; aCtx.fillRect(0,0,aCanvas.width,aCanvas.height);
-        
         aBubbles.forEach(b=>{ aCtx.fillStyle='rgba(255,255,255,0.3)'; aCtx.beginPath(); aCtx.arc(b.x,b.y,b.r,0,7); aCtx.fill(); });
-        
         aCtx.fillStyle='#59260b'; aObstacles.forEach(o=>{ 
             aCtx.fillRect(o.x,o.y,o.w,o.h); 
             aCtx.fillStyle='#f39c12'; aCtx.fillRect(o.x+5,o.y+5,o.w-10,5); aCtx.fillStyle='#59260b';
@@ -449,17 +464,15 @@
             aCtx.beginPath(); aCtx.moveTo(f.x,f.y); aCtx.lineTo(f.x+10,f.y-5); aCtx.lineTo(f.x+10,f.y+5); aCtx.fill();
         });
 
-        // Axolotl
         aCtx.save(); aCtx.translate(axo.x, axo.y); aCtx.rotate(axo.dy*0.1);
-        aCtx.fillStyle='#ff9ff3'; aCtx.fillRect(-20,-12,40,24); // Body
-        aCtx.fillStyle='#fd79a8'; aCtx.fillRect(-10,-18,5,6); aCtx.fillRect(0,-18,5,6); // Gills Top
-        aCtx.fillRect(-10,12,5,6); aCtx.fillRect(0,12,5,6); // Gills Bot
-        aCtx.fillStyle='black'; aCtx.fillRect(10,-8,4,4); aCtx.fillRect(10,4,4,4); // Eyes
+        aCtx.fillStyle='#ff9ff3'; aCtx.fillRect(-20,-12,40,24); 
+        aCtx.fillStyle='#fd79a8'; aCtx.fillRect(-10,-18,5,6); aCtx.fillRect(0,-18,5,6); 
+        aCtx.fillRect(-10,12,5,6); aCtx.fillRect(0,12,5,6); 
+        aCtx.fillStyle='black'; aCtx.fillRect(10,-8,4,4); aCtx.fillRect(10,4,4,4); 
         aCtx.restore();
 
         requestAnimationFrame(axoLoop);
     }
-
 </script>
 </body>
 </html>
