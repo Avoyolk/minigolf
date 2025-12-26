@@ -97,16 +97,19 @@
         }
 
         /* --- AXOLOTL CSS --- */
-        #axoCanvas { width: 100%; height: 100%; display: block; background: #0984e3; }
+        #axoCanvas { width: 100%; height: 100%; display: block; background: #0984e3; cursor: crosshair; }
         #axo-ui {
             position: absolute; top: 60px; left: 0; width: 100%;
             text-align: center; pointer-events: none;
         }
-        #axo-score { font-size: 24px; color: white; text-shadow: 2px 2px #000; }
+        #axo-score { font-size: 20px; color: white; text-shadow: 2px 2px #000; }
         #axo-msg { 
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 16px; text-align: center; color: #ffeaa7; text-shadow: 2px 2px #000;
+            font-size: 16px; text-align: center; color: #ffeaa7; text-shadow: 2px 2px #000; line-height: 1.5;
         }
+        .legend { font-size: 12px; color: white; margin-top: 5px;}
+        .leg-safe { color: #2ecc71; font-weight: bold; }
+        .leg-danger { color: #e74c3c; font-weight: bold; }
 
     </style>
 </head>
@@ -150,8 +153,9 @@
     <div id="axo-wrapper">
         <canvas id="axoCanvas"></canvas>
         <div id="axo-ui">
-            <div id="axo-score">FISH: 0</div>
-            <div id="axo-msg">DRAG TO SWIM!</div>
+            <div id="axo-score">SIZE: 20</div>
+            <div class="legend"><span class="leg-safe">GREEN = EAT</span> | <span class="leg-danger">RED = RUN!</span></div>
+            <div id="axo-msg">DRAG TO SWIM</div>
         </div>
     </div>
 
@@ -208,12 +212,12 @@
     }
     // Manual Levels
     addGLevel(300,800,300,150, [{x:100,y:400,w:20,h:200},{x:480,y:400,w:20,h:200}]);
-    addGLevel(300,800,300,100, [], [], [{x:300,y:450,r:60}]); // Pond
+    addGLevel(300,800,300,100, [], [], [{x:300,y:450,r:60}]); 
     addGLevel(300,800,300,100, [], [{x:300,y:300,r:40}], [{x:150,y:500,r:50},{x:450,y:500,r:50}]);
     addGLevel(300,800,300,100, [{x:0,y:400,w:240,h:20},{x:360,y:400,w:240,h:20}]);
-    addGLevel(300,800,300,100, [], [], [], [{x:300,y:450,s:80}]); // Block 67
+    addGLevel(300,800,300,100, [], [], [], [{x:300,y:450,s:80}]);
     
-    // Auto Levels 6-100
+    // Auto Levels
     for(let i=5; i<100; i++) {
         let b67=[]; if(i===66) b67=[{x:200,y:400,s:60},{x:400,y:400,s:60},{x:300,y:600,s:60}];
         let w=[], p=[], c=[];
@@ -225,7 +229,6 @@
         addGLevel(300,800, 100+Math.random()*400, 50+Math.random()*150, w, c, p, b67);
     }
 
-    // Golf Logic
     function initGolfGame() { loadGLevel(gLevelIdx); requestAnimationFrame(golfLoop); }
 
     function loadGLevel(idx) {
@@ -239,7 +242,6 @@
         document.getElementById('golf-overlay').style.display='none';
     }
 
-    // Golf Inputs
     function gGetPos(e) {
         const r = gCanvas.getBoundingClientRect();
         const sx = gCanvas.width/r.width; const sy = gCanvas.height/r.height;
@@ -356,163 +358,157 @@
     }
 
     // ==========================================
-    // GAME 2: AXOLOTL FEAST (NEW EASY MODE)
+    // GAME 2: AXOLOTL FEAST (GROWTH MODE)
     // ==========================================
     const aCanvas = document.getElementById('axoCanvas');
     const aCtx = aCanvas.getContext('2d');
     
-    let aScore=0, aFrame=0;
-    // Axolotl now has a Target X/Y that it follows smoothly
-    let axo = {x:0, y:0, tx:0, ty:0, facingRight:true, dizzy:0};
-    let aFish=[], aPuffers=[], aBubbles=[];
+    let aFrame=0, aState='PLAY';
+    let axo = {x:0, y:0, tx:0, ty:0, r:20, facingRight:true};
+    let aFish=[], aBubbles=[];
 
     function aResize() { aCanvas.width = window.innerWidth; aCanvas.height = window.innerHeight; }
     window.addEventListener('resize', aResize);
     
     function initAxoGame() {
         aResize();
-        aScore=0; aFrame=0;
-        axo.x = aCanvas.width/2; axo.y = aCanvas.height/2;
-        axo.tx = axo.x; axo.ty = axo.y; axo.dizzy=0;
-        aFish=[]; aPuffers=[]; aBubbles=[];
-        document.getElementById('axo-score').innerText="FISH: 0";
+        aFrame=0; aState='PLAY';
+        axo.x = aCanvas.width/2; axo.y = aCanvas.height/2; axo.r=20;
+        axo.tx = axo.x; axo.ty = axo.y;
+        aFish=[]; aBubbles=[];
+        document.getElementById('axo-score').innerText="SIZE: 20";
+        document.getElementById('axo-msg').innerHTML="DRAG TO SWIM<br>EAT GREEN. AVOID RED.";
         document.getElementById('axo-msg').style.display='block';
         requestAnimationFrame(axoLoop);
     }
 
     function handleAxoMove(cx, cy) {
-        if(axo.dizzy > 0) return; // Can't move if dizzy
-        axo.tx = cx; 
-        axo.ty = cy;
-        // Hide message once moved
+        if(aState === 'GAMEOVER') {
+            // Restart on click
+            initAxoGame();
+            return;
+        }
+        axo.tx = cx; axo.ty = cy;
         document.getElementById('axo-msg').style.display='none';
     }
 
     function axoLoop() {
         if(activeGame !== 'AXO') return;
 
-        // 1. Logic
-        if(axo.dizzy > 0) {
-            axo.dizzy--; // Count down dizziness
-        } else {
-            // Smooth Follow Logic (Easing)
+        if(aState === 'PLAY') {
+            // Move Axolotl
             axo.x += (axo.tx - axo.x) * 0.1; 
             axo.y += (axo.ty - axo.y) * 0.1;
-            
-            // Determine Face Direction
             if(axo.tx > axo.x + 1) axo.facingRight = true;
             if(axo.tx < axo.x - 1) axo.facingRight = false;
-        }
 
-        // Spawn Items
-        if(aFrame % 40 === 0) { // Spawn Fish
-            aFish.push({
-                x: Math.random() > 0.5 ? -20 : aCanvas.width+20,
-                y: Math.random() * aCanvas.height,
-                vx: Math.random() > 0.5 ? (Math.random()*2+2) : -(Math.random()*2+2), // Left or right
-                c: `hsl(${Math.random()*360},70%,60%)`
-            });
-        }
-        if(aFrame % 150 === 0) { // Spawn Pufferfish (Bad)
-            aPuffers.push({
-                x: Math.random() * aCanvas.width,
-                y: aCanvas.height + 50,
-                vy: -2
-            });
-        }
-        if(aFrame % 10 === 0) aBubbles.push({x:Math.random()*aCanvas.width, y:aCanvas.height+10, s:Math.random()*2+1});
-
-        // Move Items
-        aFish.forEach(f => f.x += f.vx);
-        aPuffers.forEach(p => p.y += p.vy);
-        aBubbles.forEach(b => b.y -= b.s);
-
-        // Cleanup
-        aFish = aFish.filter(f => f.x > -50 && f.x < aCanvas.width+50);
-        aPuffers = aPuffers.filter(p => p.y > -50);
-        aBubbles = aBubbles.filter(b => b.y > -10);
-
-        // Collisions
-        // Eat Fish
-        aFish = aFish.filter(f => {
-            if(Math.hypot(axo.x - f.x, axo.y - f.y) < 35) {
-                aScore++; 
-                document.getElementById('axo-score').innerText = "FISH: " + aScore;
-                return false; // Remove fish
+            // Spawn Fish
+            if(aFrame % 30 === 0) {
+                let sizeMult = Math.random() * 2.5; // Random size modifier
+                // Bias spawns: mostly edible, some dangerous
+                let r = Math.random() > 0.7 ? (axo.r * 1.5) : (axo.r * 0.6);
+                // Ensure r isn't tiny
+                if(r < 10) r = 10;
+                
+                aFish.push({
+                    x: Math.random() > 0.5 ? -50 : aCanvas.width+50,
+                    y: Math.random() * aCanvas.height,
+                    vx: Math.random() > 0.5 ? (Math.random()*2+1) : -(Math.random()*2+1),
+                    r: r
+                });
             }
-            return true;
-        });
+            if(aFrame % 10 === 0) aBubbles.push({x:Math.random()*aCanvas.width, y:aCanvas.height+10, s:Math.random()*2+1});
 
-        // Hit Pufferfish (Get Dizzy)
-        aPuffers.forEach(p => {
-            if(axo.dizzy === 0 && Math.hypot(axo.x - p.x, axo.y - p.y) < 40) {
-                axo.dizzy = 60; // 1 second stun
+            // Update Entities
+            aBubbles.forEach(b => b.y -= b.s);
+            aBubbles = aBubbles.filter(b => b.y > -10);
+
+            aFish.forEach(f => {
+                f.x += f.vx;
+                // Determine if Safe or Dangerous dynamically
+                f.isDangerous = f.r > axo.r;
+                f.color = f.isDangerous ? '#e74c3c' : '#2ecc71'; // Red vs Green
+            });
+
+            // Collisions
+            for(let i = aFish.length-1; i >= 0; i--) {
+                let f = aFish[i];
+                // Check distance
+                if(Math.hypot(axo.x - f.x, axo.y - f.y) < axo.r + f.r * 0.8) {
+                    if(f.isDangerous) {
+                        // DIE
+                        aState = 'GAMEOVER';
+                        document.getElementById('axo-msg').innerHTML=`GAME OVER<br>YOU WERE EATEN!<br>TAP TO RESTART`;
+                        document.getElementById('axo-msg').style.display='block';
+                    } else {
+                        // EAT
+                        axo.r += 2; // Grow!
+                        aFish.splice(i, 1);
+                        document.getElementById('axo-score').innerText="SIZE: " + Math.floor(axo.r);
+                    }
+                }
             }
-        });
 
-        aFrame++;
+            // Cleanup off-screen fish
+            aFish = aFish.filter(f => f.x > -100 && f.x < aCanvas.width+100);
+            
+            aFrame++;
+        }
 
-        // 2. Draw
+        // --- DRAW ---
         aCtx.fillStyle = '#0984e3'; aCtx.fillRect(0,0,aCanvas.width,aCanvas.height);
         
-        // Bubbles
-        aCtx.fillStyle='rgba(255,255,255,0.2)'; 
-        aBubbles.forEach(b=>{ aCtx.beginPath(); aCtx.arc(b.x,b.y,b.s*2,0,7); aCtx.fill(); });
+        aBubbles.forEach(b=>{ aCtx.fillStyle='rgba(255,255,255,0.2)'; aCtx.beginPath(); aCtx.arc(b.x,b.y,b.s*2,0,7); aCtx.fill(); });
 
-        // Fish
+        // Draw Fish
         aFish.forEach(f=>{
-            aCtx.fillStyle=f.c; 
-            aCtx.beginPath(); aCtx.arc(f.x,f.y,8,0,7); aCtx.fill(); // Body
+            aCtx.fillStyle = f.color;
+            aCtx.beginPath(); aCtx.arc(f.x,f.y,f.r,0,7); aCtx.fill(); // Body
+            
+            // Tail logic
             aCtx.beginPath(); 
-            if(f.vx > 0) { aCtx.moveTo(f.x-8,f.y); aCtx.lineTo(f.x-16,f.y-6); aCtx.lineTo(f.x-16,f.y+6); }
-            else { aCtx.moveTo(f.x+8,f.y); aCtx.lineTo(f.x+16,f.y-6); aCtx.lineTo(f.x+16,f.y+6); }
-            aCtx.fill(); // Tail
-        });
+            if(f.vx > 0) { 
+                aCtx.moveTo(f.x-f.r, f.y); 
+                aCtx.lineTo(f.x-f.r*2, f.y-f.r*0.6); 
+                aCtx.lineTo(f.x-f.r*2, f.y+f.r*0.6); 
+            } else { 
+                aCtx.moveTo(f.x+f.r, f.y); 
+                aCtx.lineTo(f.x+f.r*2, f.y-f.r*0.6); 
+                aCtx.lineTo(f.x+f.r*2, f.y+f.r*0.6); 
+            }
+            aCtx.fill();
 
-        // Pufferfish (Spiky)
-        aPuffers.forEach(p=>{
-            aCtx.fillStyle='#e17055'; 
-            aCtx.beginPath(); aCtx.arc(p.x,p.y,15,0,7); aCtx.fill();
-            // Spikes
-            for(let i=0;i<8;i++) {
-                let ang = (Math.PI*2/8)*i;
-                let sx = p.x + Math.cos(ang)*20, sy = p.y + Math.sin(ang)*20;
-                aCtx.beginPath(); aCtx.moveTo(p.x,p.y); aCtx.lineTo(sx,sy); aCtx.stroke();
+            // Angry Eye for dangerous fish
+            if(f.isDangerous) {
+                aCtx.fillStyle = 'white';
+                aCtx.beginPath(); aCtx.arc(f.x, f.y-f.r*0.3, f.r*0.3, 0, 7); aCtx.fill();
+                aCtx.fillStyle = 'black';
+                aCtx.beginPath(); aCtx.arc(f.x, f.y-f.r*0.3, f.r*0.1, 0, 7); aCtx.fill();
             }
         });
 
         // Draw Axolotl
-        aCtx.save();
-        aCtx.translate(axo.x, axo.y);
-        if(!axo.facingRight) aCtx.scale(-1, 1); // Flip if moving left
-        
-        if(axo.dizzy > 0) {
-             aCtx.rotate(Math.random()*0.5 - 0.25); // Shake if dizzy
-             document.getElementById('axo-msg').innerText = "OUCH!";
-             document.getElementById('axo-msg').style.display = 'block';
+        if(aState !== 'GAMEOVER') {
+            aCtx.save();
+            aCtx.translate(axo.x, axo.y);
+            if(!axo.facingRight) aCtx.scale(-1, 1);
+            
+            // Body
+            aCtx.fillStyle='#ff9ff3'; 
+            aCtx.beginPath(); aCtx.ellipse(0, 0, axo.r, axo.r*0.6, 0, 0, Math.PI*2); aCtx.fill();
+            // Tail
+            aCtx.fillRect(-axo.r*1.4, -axo.r*0.2, axo.r*0.6, axo.r*0.4);
+            // Gills
+            aCtx.fillStyle='#fd79a8'; 
+            aCtx.beginPath(); aCtx.arc(-axo.r*0.4, -axo.r*0.5, axo.r*0.25, 0, Math.PI*2); aCtx.fill();
+            aCtx.beginPath(); aCtx.arc(-axo.r*0.1, -axo.r*0.6, axo.r*0.25, 0, Math.PI*2); aCtx.fill();
+            // Face
+            aCtx.fillStyle='black'; 
+            aCtx.beginPath(); aCtx.arc(axo.r*0.4, -axo.r*0.2, axo.r*0.1, 0, Math.PI*2); aCtx.fill(); 
+            aCtx.beginPath(); aCtx.arc(axo.r*0.4, axo.r*0.2, axo.r*0.1, 0, Math.PI*2); aCtx.fill(); 
+            
+            aCtx.restore();
         }
-
-        // Body
-        aCtx.fillStyle='#ff9ff3'; 
-        aCtx.beginPath(); aCtx.ellipse(0, 0, 25, 15, 0, 0, Math.PI*2); aCtx.fill();
-        // Tail
-        aCtx.fillRect(-35, -5, 15, 10);
-        // Gills
-        aCtx.fillStyle='#fd79a8'; 
-        aCtx.beginPath(); aCtx.arc(-10, -12, 6, 0, Math.PI*2); aCtx.fill();
-        aCtx.beginPath(); aCtx.arc(-2, -14, 6, 0, Math.PI*2); aCtx.fill();
-        // Face
-        aCtx.fillStyle='black'; 
-        aCtx.beginPath(); aCtx.arc(10, -5, 2, 0, Math.PI*2); aCtx.fill(); // Eye
-        aCtx.beginPath(); aCtx.arc(10, 5, 2, 0, Math.PI*2); aCtx.fill(); // Eye
-        
-        if(axo.dizzy > 0) {
-            // X Eyes if dizzy
-            aCtx.strokeStyle='white'; aCtx.lineWidth=2;
-            aCtx.beginPath(); aCtx.moveTo(8,-7); aCtx.lineTo(12,-3); aCtx.moveTo(12,-7); aCtx.lineTo(8,-3); aCtx.stroke();
-        }
-
-        aCtx.restore();
 
         requestAnimationFrame(axoLoop);
     }
